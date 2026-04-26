@@ -4,7 +4,7 @@ import { POSView } from './components/POSView';
 import { AdminView } from './components/AdminView';
 import { GuestView } from './components/GuestView';
 import { LoginView } from './components/LoginView';
-import { AppStatePayload, Order, Product } from './types';
+import { AppStatePayload, CATEGORY_OPTIONS, Order, Product } from './types';
 import { initialProducts } from './data/initialData';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 
@@ -14,13 +14,22 @@ const toPayload = (
   products: Product[],
   orders: Order[],
   pdfMenu: string | null,
-  menuImages: string[]
+  menuImages: string[],
+  categories: string[]
 ): AppStatePayload => ({
   products,
   orders,
   pdfMenu,
   menuImages,
+  categories,
 });
+
+const normalizeProducts = (products: Product[] | undefined): Product[] => {
+  if (!products || products.length === 0) {
+    return initialProducts;
+  }
+  return products;
+};
 
 function App() {
   const [view, setView] = useState<'guest' | 'pos' | 'admin' | 'login'>('guest');
@@ -47,6 +56,11 @@ function App() {
   const [menuImages, setMenuImages] = useState<string[]>(() => {
     const saved = localStorage.getItem('palette_menu_images');
     return saved ? JSON.parse(saved) : [];
+  });
+
+  const [categories, setCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem('palette_categories');
+    return saved ? JSON.parse(saved) : [...CATEGORY_OPTIONS];
   });
 
   const [cloudStatus, setCloudStatus] = useState<'disabled' | 'syncing' | 'ready' | 'error'>(
@@ -83,6 +97,12 @@ function App() {
     }
   }, [menuImages]);
 
+  useEffect(() => {
+    if (categories.length > 0) {
+      localStorage.setItem('palette_categories', JSON.stringify(categories));
+    }
+  }, [categories]);
+
   // Initial cloud bootstrap: load shared data once when Supabase is configured.
   useEffect(() => {
     if (!supabase) {
@@ -106,19 +126,39 @@ function App() {
 
         if (!isCancelled && data?.payload) {
           const payload = data.payload as AppStatePayload;
+          const normalizedProducts = normalizeProducts(payload.products);
           isApplyingCloudUpdate.current = true;
-          setProducts(payload.products || initialProducts);
+          setProducts(normalizedProducts);
           setOrders(payload.orders || []);
           setPdfMenu(payload.pdfMenu || null);
           setMenuImages(payload.menuImages || []);
+          setCategories(payload.categories && payload.categories.length > 0 ? payload.categories : [...CATEGORY_OPTIONS]);
           setLastCloudUpdateAt(data.updated_at || null);
           setTimeout(() => {
             isApplyingCloudUpdate.current = false;
           }, 0);
+
+          // Self-heal cloud state when products array is empty.
+          if (payload.products?.length === 0) {
+            const now = new Date().toISOString();
+            await client.from('app_state').upsert(
+              {
+                id: APP_STATE_ID,
+                payload: {
+                  ...payload,
+                  products: normalizedProducts,
+                  categories: payload.categories && payload.categories.length > 0 ? payload.categories : [...CATEGORY_OPTIONS],
+                },
+                updated_at: now,
+              },
+              { onConflict: 'id' }
+            );
+            setLastCloudUpdateAt(now);
+          }
         }
 
         if (!isCancelled && !data) {
-          const seededPayload = toPayload(products, orders, pdfMenu, menuImages);
+          const seededPayload = toPayload(normalizeProducts(products), orders, pdfMenu, menuImages, categories);
           const now = new Date().toISOString();
           const { error: insertError } = await client.from('app_state').upsert(
             {
@@ -134,6 +174,7 @@ function App() {
           }
 
           setLastCloudUpdateAt(now);
+          setProducts(normalizeProducts(products));
         }
 
         if (!isCancelled) {
@@ -167,7 +208,7 @@ function App() {
       try {
         setCloudStatus('syncing');
         const now = new Date().toISOString();
-        const payload = toPayload(products, orders, pdfMenu, menuImages);
+        const payload = toPayload(products, orders, pdfMenu, menuImages, categories);
 
         const { error } = await client.from('app_state').upsert(
           {
@@ -197,7 +238,7 @@ function App() {
       isCancelled = true;
       window.clearTimeout(syncTimer);
     };
-  }, [products, orders, pdfMenu, menuImages]);
+  }, [products, orders, pdfMenu, menuImages, categories]);
 
   // Pull remote changes periodically to keep all devices in sync.
   useEffect(() => {
@@ -220,11 +261,13 @@ function App() {
 
         if (!lastCloudUpdateAt || new Date(data.updated_at).getTime() > new Date(lastCloudUpdateAt).getTime()) {
           const payload = data.payload as AppStatePayload;
+          const normalizedProducts = normalizeProducts(payload.products);
           isApplyingCloudUpdate.current = true;
-          setProducts(payload.products || initialProducts);
+          setProducts(normalizedProducts);
           setOrders(payload.orders || []);
           setPdfMenu(payload.pdfMenu || null);
           setMenuImages(payload.menuImages || []);
+          setCategories(payload.categories && payload.categories.length > 0 ? payload.categories : [...CATEGORY_OPTIONS]);
           setLastCloudUpdateAt(data.updated_at);
           setTimeout(() => {
             isApplyingCloudUpdate.current = false;
@@ -344,7 +387,6 @@ function App() {
         {view === 'pos' && isLoggedIn.pos && (
           <POSView 
             products={products} 
-            updateProducts={setProducts}
             onCompleteOrder={addOrder} 
           />
         )}
@@ -359,6 +401,8 @@ function App() {
             setPdfMenu={setPdfMenu}
             menuImages={menuImages}
             setMenuImages={setMenuImages}
+            categories={categories}
+            setCategories={setCategories}
           />
         )}
       </main>

@@ -17,11 +17,10 @@ import { Order, OrderItem, Product } from '../types';
 
 interface POSViewProps {
   products: Product[];
-  updateProducts: (products: Product[]) => void;
   onCompleteOrder: (order: Order) => void;
 }
 
-export const POSView: React.FC<POSViewProps> = ({ products, updateProducts, onCompleteOrder }) => {
+export const POSView: React.FC<POSViewProps> = ({ products, onCompleteOrder }) => {
   const [cart, setCart] = useState<OrderItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -192,14 +191,6 @@ export const POSView: React.FC<POSViewProps> = ({ products, updateProducts, onCo
 
     onCompleteOrder(finalizedOrder);
 
-    const nextProducts = products.map((product) => {
-      const soldQty = cart
-        .filter((item) => item.productId === product.id)
-        .reduce((sum, item) => sum + item.quantity, 0);
-      return { ...product, stock: Math.max(0, product.stock - soldQty) };
-    });
-    updateProducts(nextProducts);
-
     setCompletedOrder(finalizedOrder);
     setCart([]);
     setIsCheckoutOpen(false);
@@ -241,17 +232,13 @@ export const POSView: React.FC<POSViewProps> = ({ products, updateProducts, onCo
             <button
               key={product.id}
               onClick={() => addToCart(product)}
-              disabled={product.stock <= 0}
-              className={`p-4 rounded-2xl bg-white border border-[#4A3728]/5 shadow-sm hover:shadow-md hover:border-[#D97706]/30 transition-all text-left ${
-                product.stock <= 0 ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className="p-4 rounded-2xl bg-white border border-[#4A3728]/5 shadow-sm hover:shadow-md hover:border-[#D97706]/30 transition-all text-left"
             >
               <div className="w-10 h-10 bg-[#FDF8F3] rounded-full flex items-center justify-center mb-3 text-[#D97706]">
                 <Plus size={20} />
               </div>
               <p className="font-bold text-sm min-h-10">{product.name}</p>
               <p className="text-[#D97706] font-bold mt-1">{product.price.toLocaleString()} SYP</p>
-              <p className="text-[11px] text-[#4A3728]/50">Stock: {product.stock}</p>
             </button>
           ))}
         </div>

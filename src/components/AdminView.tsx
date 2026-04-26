@@ -18,7 +18,7 @@ import {
   RefreshCw,
   Undo2
 } from 'lucide-react';
-import { CATEGORY_OPTIONS, Product, Order } from '../types';
+import { Product, Order } from '../types';
 import { format, isToday, isYesterday, subDays, startOfDay } from 'date-fns';
 
 interface AdminViewProps {
@@ -30,6 +30,8 @@ interface AdminViewProps {
   setPdfMenu: (url: string | null) => void;
   menuImages: string[];
   setMenuImages: React.Dispatch<React.SetStateAction<string[]>>;
+  categories: string[];
+  setCategories: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({ 
@@ -40,7 +42,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
   pdfMenu, 
   setPdfMenu,
   menuImages,
-  setMenuImages
+  setMenuImages,
+  categories,
+  setCategories
 }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'menu' | 'system'>('products');
   const [isAddingProduct, setIsAddingProduct] = useState(false);
@@ -49,6 +53,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   // Filters
   const [productCategoryFilter, setProductCategoryFilter] = useState('All');
   const [productSearch, setProductSearch] = useState('');
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [orderDateFilter, setOrderDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'custom'>('all');
   const [customDateRange, setCustomDateRange] = useState({
     from: format(new Date(), 'yyyy-MM-dd'),
@@ -60,7 +65,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     name: '',
     price: 0,
     stock: 0,
-    category: CATEGORY_OPTIONS[0]
+    category: categories[0] || 'عام'
   });
 
   const handleAddProduct = () => {
@@ -77,13 +82,27 @@ export const AdminView: React.FC<AdminViewProps> = ({
         id: Math.random().toString(36).substr(2, 9),
         name: newProduct.name,
         price: newProduct.price,
-        stock: newProduct.stock || 0,
-        category: newProduct.category || 'Coffee'
+        stock: 0,
+        category: newProduct.category || categories[0] || 'عام'
       };
       setProducts([...products, product]);
-      setNewProduct({ name: '', price: 0, stock: 0, category: CATEGORY_OPTIONS[0] });
+      setNewProduct({ name: '', price: 0, stock: 0, category: categories[0] || 'عام' });
       setIsAddingProduct(false);
     }
+  };
+
+  const handleAddCategory = () => {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) {
+      return;
+    }
+    if (categories.includes(trimmed)) {
+      alert('Category already exists.');
+      return;
+    }
+    setCategories((prev) => [...prev, trimmed]);
+    setNewCategoryName('');
+    setNewProduct((prev) => ({ ...prev, category: trimmed }));
   };
 
   const deleteProduct = (id: string) => {
@@ -317,7 +336,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const totalRevenue = filteredOrders.reduce((sum, o) => sum + o.total, 0);
   const totalSalesCount = filteredOrders.length;
 
-  const adminCategories = ['All', ...new Set(products.map(p => p.category))];
+  const adminCategories = ['All', ...new Set([...categories, ...products.map((p) => p.category)])];
 
   const handleBackup = () => {
     const data = {
@@ -422,6 +441,22 @@ export const AdminView: React.FC<AdminViewProps> = ({
             className="w-full max-w-md rounded-xl border border-[#4A3728]/10 bg-white px-4 py-2.5 outline-none ring-[#D97706] focus:ring-2"
           />
 
+          <div className="flex flex-col sm:flex-row gap-2 max-w-xl">
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Add new category..."
+              className="flex-1 rounded-xl border border-[#4A3728]/10 bg-white px-4 py-2.5 outline-none ring-[#D97706] focus:ring-2"
+            />
+            <button
+              onClick={handleAddCategory}
+              className="rounded-xl bg-[#4A3728] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#32251B]"
+            >
+              Add Category
+            </button>
+          </div>
+
           <div className="flex gap-2 overflow-x-auto pb-4">
             {adminCategories.map(cat => (
               <button
@@ -445,7 +480,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   <th className="p-4">Name</th>
                   <th className="p-4">Category</th>
                   <th className="p-4">Price</th>
-                  <th className="p-4">Stock</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -466,7 +500,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         value={newProduct.category}
                         onChange={e => setNewProduct({...newProduct, category: e.target.value})}
                       >
-                        {CATEGORY_OPTIONS.map((category) => (
+                        {adminCategories.filter((category) => category !== 'All').map((category) => (
                           <option key={category}>{category}</option>
                         ))}
                       </select>
@@ -479,15 +513,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         placeholder="0.00"
                         value={newProduct.price}
                         onChange={e => setNewProduct({...newProduct, price: parseFloat(e.target.value)})}
-                      />
-                    </td>
-                    <td className="p-4">
-                      <input 
-                        type="number"
-                        className="w-full p-2 rounded border border-[#4A3728]/20"
-                        placeholder="0"
-                        value={newProduct.stock}
-                        onChange={e => setNewProduct({...newProduct, stock: parseInt(e.target.value)})}
                       />
                     </td>
                     <td className="p-4 text-right space-x-2">
@@ -514,7 +539,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           value={editingProduct?.category || ''}
                           onChange={e => setEditingProduct(prev => prev ? {...prev, category: e.target.value} : null)}
                         >
-                          {CATEGORY_OPTIONS.map((category) => (
+                          {adminCategories.filter((category) => category !== 'All').map((category) => (
                             <option key={category}>{category}</option>
                           ))}
                         </select>
@@ -534,20 +559,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           onChange={e => setEditingProduct(prev => prev ? {...prev, price: parseFloat(e.target.value)} : null)}
                         />
                       ) : `${product.price.toLocaleString()} SYP`}
-                    </td>
-                    <td className="p-4">
-                      {editingProductId === product.id ? (
-                        <input 
-                          type="number"
-                          className="w-16 p-1 border border-[#D97706] rounded"
-                          value={editingProduct?.stock || 0}
-                          onChange={e => setEditingProduct(prev => prev ? {...prev, stock: parseInt(e.target.value)} : null)}
-                        />
-                      ) : (
-                        <span className={`${product.stock < 10 ? 'text-red-500 font-bold' : ''}`}>
-                          {product.stock}
-                        </span>
-                      )}
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2">

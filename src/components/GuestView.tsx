@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, MapPin } from 'lucide-react';
+import { FileText } from 'lucide-react';
 
 interface GuestViewProps {
   pdfMenu: string | null;
@@ -45,29 +45,6 @@ export const GuestView: React.FC<GuestViewProps> = ({ menuImages }) => {
               ))}
             </div>
           )}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-           <div className="bg-[#4A3728] text-[#FDF8F3] p-8 rounded-[2rem] shadow-xl">
-              <h3 className="text-2xl font-bold mb-6 border-b border-white/10 pb-4">Opening Hours</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium opacity-60">Mon - Fri</span>
-                  <span className="font-bold">08:00 - 18:00</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-medium opacity-60">Sat - Sun</span>
-                  <span className="font-bold">09:00 - 19:00</span>
-                </div>
-              </div>
-           </div>
-           
-           <div className="bg-[#D97706] text-white p-8 rounded-[2rem] shadow-xl flex flex-col justify-center items-center text-center">
-              <MapPin size={40} className="mb-4" />
-              <h3 className="text-2xl font-bold mb-2">Location</h3>
-              <p className="font-medium opacity-90">Main Street 123, Coffee City</p>
-              <p className="text-sm mt-4 opacity-70">Follow us @palette_coffee_shop</p>
-           </div>
         </div>
       </div>
     </div>

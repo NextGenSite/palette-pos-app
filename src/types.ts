@@ -30,6 +30,7 @@ export interface AppStatePayload {
   orders: Order[];
   pdfMenu: string | null;
   menuImages: string[];
+  categories: string[];
 }
 
 export const CATEGORY_OPTIONS = [
