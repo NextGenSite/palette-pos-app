@@ -26,3 +26,10 @@ export interface Order {
 }
 
 export type Category = 'Coffee' | 'Pastry' | 'Drinks' | 'Snacks';
+
+export interface AppStatePayload {
+  products: Product[];
+  orders: Order[];
+  pdfMenu: string | null;
+  menuImages: string[];
+}
