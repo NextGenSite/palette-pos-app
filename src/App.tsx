@@ -29,7 +29,7 @@ function App() {
     pos: false,
     admin: false,
   });
-
+  
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('palette_products');
     return saved ? JSON.parse(saved) : initialProducts;
@@ -56,7 +56,7 @@ function App() {
   const isApplyingCloudUpdate = useRef(false);
   const isCloudReady = useRef(!isSupabaseConfigured);
 
-  // Local persistence fallback
+  // Persistent Sync
   useEffect(() => {
     if (products.length > 0 || localStorage.getItem('palette_products')) {
       localStorage.setItem('palette_products', JSON.stringify(products));
@@ -83,12 +83,13 @@ function App() {
     }
   }, [menuImages]);
 
-  // Initial cloud bootstrap
+  // Initial cloud bootstrap: load shared data once when Supabase is configured.
   useEffect(() => {
     if (!supabase) {
       return;
     }
     const client = supabase;
+
     let isCancelled = false;
 
     const bootstrapCloud = async () => {
@@ -99,7 +100,9 @@ function App() {
           .eq('id', APP_STATE_ID)
           .maybeSingle();
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         if (!isCancelled && data?.payload) {
           const payload = data.payload as AppStatePayload;
@@ -126,7 +129,10 @@ function App() {
             { onConflict: 'id' }
           );
 
-          if (insertError) throw insertError;
+          if (insertError) {
+            throw insertError;
+          }
+
           setLastCloudUpdateAt(now);
         }
 
@@ -149,15 +155,14 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Push local changes to cloud
+  // Push local changes to cloud.
   useEffect(() => {
     if (!supabase || !isCloudReady.current || isApplyingCloudUpdate.current) {
       return;
     }
-
     const client = supabase;
-    let isCancelled = false;
 
+    let isCancelled = false;
     const syncTimer = window.setTimeout(async () => {
       try {
         setCloudStatus('syncing');
@@ -173,7 +178,9 @@ function App() {
           { onConflict: 'id' }
         );
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         if (!isCancelled) {
           setCloudStatus('ready');
@@ -192,7 +199,7 @@ function App() {
     };
   }, [products, orders, pdfMenu, menuImages]);
 
-  // Pull remote changes periodically
+  // Pull remote changes periodically to keep all devices in sync.
   useEffect(() => {
     if (!supabase || !isCloudReady.current) {
       return;
@@ -224,7 +231,7 @@ function App() {
           }, 0);
         }
       } catch {
-        // Ignore single poll errors
+        // Keep UI responsive even if one poll fails.
       }
     }, 5000);
 
@@ -244,16 +251,17 @@ function App() {
   };
 
   const addOrder = (order: Order) => {
-    setOrders((prev) => [order, ...prev]);
+    setOrders(prev => [order, ...prev]);
   };
 
   return (
     <div className="min-h-screen bg-[#FDF8F3] text-[#4A3728] font-sans">
+      {/* Navigation */}
       <nav className="bg-[#4A3728] text-[#FDF8F3] px-4 py-2 flex justify-between items-center shadow-lg sticky top-0 z-50">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('guest')}>
-          <img
-            src="/logo.png"
-            alt="Palette Logo"
+          <img 
+            src="/logo.png" 
+            alt="Palette Logo" 
             className="h-12 w-12 object-contain bg-white/10 rounded-lg p-1"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
@@ -265,26 +273,26 @@ function App() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight">PALETTE</h1>
         </div>
-
+        
         <div className="flex gap-2">
           {view !== 'guest' && (
-            <button
+            <button 
               onClick={() => setView('guest')}
               className="px-4 py-2 rounded-lg hover:bg-[#5D4636] transition-colors flex items-center gap-2"
             >
               <MenuIcon size={20} /> <span className="hidden sm:inline">Guest Menu</span>
             </button>
           )}
-
+          
           {!isLoggedIn.pos ? (
-            <button
+            <button 
               onClick={() => handleLogin('pos')}
               className="px-4 py-2 rounded-lg bg-[#D97706] hover:bg-[#B45309] transition-colors flex items-center gap-2"
             >
               <ShoppingCart size={20} /> <span className="hidden sm:inline">POS</span>
             </button>
           ) : (
-            <button
+            <button 
               onClick={() => setView('pos')}
               className={`px-4 py-2 rounded-lg flex items-center gap-2 ${view === 'pos' ? 'bg-[#D97706]' : 'hover:bg-[#5D4636]'}`}
             >
@@ -293,14 +301,14 @@ function App() {
           )}
 
           {!isLoggedIn.admin ? (
-            <button
+            <button 
               onClick={() => handleLogin('admin')}
               className="px-4 py-2 rounded-lg border border-[#D97706] text-[#D97706] hover:bg-[#D97706] hover:text-white transition-all flex items-center gap-2"
             >
               <Settings size={20} /> <span className="hidden sm:inline">Admin</span>
             </button>
           ) : (
-            <button
+            <button 
               onClick={() => setView('admin')}
               className={`px-4 py-2 rounded-lg flex items-center gap-2 ${view === 'admin' ? 'bg-[#D97706]' : 'hover:bg-[#5D4636]'}`}
             >
@@ -309,7 +317,10 @@ function App() {
           )}
 
           {(isLoggedIn.pos || isLoggedIn.admin) && (
-            <button onClick={handleLogout} className="p-2 text-red-400 hover:text-red-300 transition-colors">
+            <button 
+              onClick={handleLogout}
+              className="p-2 text-red-400 hover:text-red-300 transition-colors"
+            >
               <LogOut size={20} />
             </button>
           )}
@@ -318,27 +329,32 @@ function App() {
 
       <main className="container mx-auto p-4 md:p-6">
         {view === 'guest' && <GuestView pdfMenu={pdfMenu} menuImages={menuImages} />}
-
+        
         {view === 'login' && (
-          <LoginView
-            target={loginTarget}
+          <LoginView 
+            target={loginTarget} 
             onSuccess={() => {
-              setIsLoggedIn((prev) => ({ ...prev, [loginTarget]: true }));
+              setIsLoggedIn(prev => ({ ...prev, [loginTarget]: true }));
               setView(loginTarget);
-            }}
+            }} 
             onCancel={() => setView('guest')}
           />
         )}
-
+        
         {view === 'pos' && isLoggedIn.pos && (
-          <POSView products={products} updateProducts={setProducts} onCompleteOrder={addOrder} />
+          <POSView 
+            products={products} 
+            updateProducts={setProducts}
+            onCompleteOrder={addOrder} 
+          />
         )}
-
+        
         {view === 'admin' && isLoggedIn.admin && (
-          <AdminView
-            products={products}
-            setProducts={setProducts}
+          <AdminView 
+            products={products} 
+            setProducts={setProducts} 
             orders={orders}
+            setOrders={setOrders}
             pdfMenu={pdfMenu}
             setPdfMenu={setPdfMenu}
             menuImages={menuImages}
@@ -349,14 +365,15 @@ function App() {
 
       <footer className="text-center p-8 text-[#4A3728]/60 text-sm space-y-1">
         <div>
-          Sync:{' '}
-          {cloudStatus === 'disabled'
-            ? 'Local only'
-            : cloudStatus === 'ready'
-              ? 'Cloud connected'
-              : cloudStatus === 'syncing'
-                ? 'Syncing...'
-                : 'Cloud error'}
+          Sync: {
+            cloudStatus === 'disabled'
+              ? 'Local only'
+              : cloudStatus === 'ready'
+                ? 'Cloud connected'
+                : cloudStatus === 'syncing'
+                  ? 'Syncing...'
+                  : 'Cloud error'
+          }
         </div>
         {lastCloudUpdateAt && <div>Last cloud update: {new Date(lastCloudUpdateAt).toLocaleString()}</div>}
         &copy; {new Date().getFullYear()} Palette Coffee Shop. All rights reserved.

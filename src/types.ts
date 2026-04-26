@@ -25,11 +25,24 @@ export interface Order {
   paymentMethod: 'Cash' | 'Card';
 }
 
-export type Category = 'Coffee' | 'Pastry' | 'Drinks' | 'Snacks';
-
 export interface AppStatePayload {
   products: Product[];
   orders: Order[];
   pdfMenu: string | null;
   menuImages: string[];
 }
+
+export const CATEGORY_OPTIONS = [
+  'ميلك شيك',
+  'آيس',
+  'ساخن',
+  'بارد',
+  'دولشي',
+  'قوالب شوكولا',
+  'معجنات',
+  'أعمال يدوية',
+  'أراغيل',
+  'حجوزات',
+] as const;
+
+export type Category = (typeof CATEGORY_OPTIONS)[number];

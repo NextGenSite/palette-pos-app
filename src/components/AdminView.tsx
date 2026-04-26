@@ -15,15 +15,17 @@ import {
   Banknote,
   Settings,
   Save,
-  RefreshCw
+  RefreshCw,
+  Undo2
 } from 'lucide-react';
-import { Product, Order } from '../types';
+import { CATEGORY_OPTIONS, Product, Order } from '../types';
 import { format, isToday, isYesterday, subDays, startOfDay } from 'date-fns';
 
 interface AdminViewProps {
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   orders: Order[];
+  setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   pdfMenu: string | null;
   setPdfMenu: (url: string | null) => void;
   menuImages: string[];
@@ -34,6 +36,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   products, 
   setProducts, 
   orders, 
+  setOrders,
   pdfMenu, 
   setPdfMenu,
   menuImages,
@@ -45,6 +48,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   
   // Filters
   const [productCategoryFilter, setProductCategoryFilter] = useState('All');
+  const [productSearch, setProductSearch] = useState('');
   const [orderDateFilter, setOrderDateFilter] = useState<'all' | 'today' | 'yesterday' | 'week' | 'custom'>('all');
   const [customDateRange, setCustomDateRange] = useState({
     from: format(new Date(), 'yyyy-MM-dd'),
@@ -56,11 +60,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
     name: '',
     price: 0,
     stock: 0,
-    category: 'Coffee'
+    category: CATEGORY_OPTIONS[0]
   });
 
   const handleAddProduct = () => {
     if (newProduct.name && newProduct.price !== undefined) {
+      if (newProduct.price <= 0) {
+        alert('Price must be greater than 0.');
+        return;
+      }
+      if ((newProduct.stock || 0) < 0) {
+        alert('Stock cannot be negative.');
+        return;
+      }
       const product: Product = {
         id: Math.random().toString(36).substr(2, 9),
         name: newProduct.name,
@@ -69,7 +81,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
         category: newProduct.category || 'Coffee'
       };
       setProducts([...products, product]);
-      setNewProduct({ name: '', price: 0, stock: 0, category: 'Coffee' });
+      setNewProduct({ name: '', price: 0, stock: 0, category: CATEGORY_OPTIONS[0] });
       setIsAddingProduct(false);
     }
   };
@@ -145,9 +157,102 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setMenuImages((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [editingOrderDraft, setEditingOrderDraft] = useState<Order | null>(null);
+  const [orderUndoStack, setOrderUndoStack] = useState<Order[][]>([]);
+
+  const pushOrderSnapshot = () => {
+    setOrderUndoStack((prev) => [[...orders], ...prev].slice(0, 20));
+  };
+
+  const undoLastOrderChange = () => {
+    setOrderUndoStack((prev) => {
+      if (prev.length === 0) {
+        return prev;
+      }
+      const [latestSnapshot, ...remaining] = prev;
+      setOrders(latestSnapshot);
+      setEditingOrderId(null);
+      setEditingOrderDraft(null);
+      return remaining;
+    });
+  };
+
+  const recalculateOrder = (order: Order): Order => {
+    const subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const tax = subtotal * 0.07;
+    return {
+      ...order,
+      items: order.items.map((item) => ({
+        ...item,
+        subtotal: item.price * item.quantity,
+      })),
+      subtotal,
+      tax,
+      total: subtotal + tax,
+    };
+  };
+
+  const startEditOrder = (order: Order) => {
+    setEditingOrderId(order.id);
+    setEditingOrderDraft(JSON.parse(JSON.stringify(order)));
+  };
+
+  const saveOrderDraft = () => {
+    if (!editingOrderDraft) return;
+    const normalized = recalculateOrder(editingOrderDraft);
+    pushOrderSnapshot();
+    setOrders((prev) => prev.map((order) => (order.id === normalized.id ? normalized : order)));
+    setEditingOrderId(null);
+    setEditingOrderDraft(null);
+  };
+
+  const deleteOrder = (orderId: string) => {
+    if (!window.confirm('Delete this order permanently?')) {
+      return;
+    }
+    pushOrderSnapshot();
+    setOrders((prev) => prev.filter((order) => order.id !== orderId));
+    if (editingOrderId === orderId) {
+      setEditingOrderId(null);
+      setEditingOrderDraft(null);
+    }
+  };
+
+  const updateDraftItem = (itemId: string, key: 'quantity' | 'price', value: number) => {
+    setEditingOrderDraft((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        items: prev.items.map((item) => {
+          if (item.id !== itemId) return item;
+          const safeValue = key === 'quantity' ? Math.max(1, Math.floor(value)) : Math.max(0, value);
+          return {
+            ...item,
+            [key]: safeValue,
+            subtotal: key === 'quantity' ? safeValue * item.price : item.quantity * safeValue,
+          };
+        }),
+      };
+      return recalculateOrder(next);
+    });
+  };
+
+  const removeDraftItem = (itemId: string) => {
+    setEditingOrderDraft((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        items: prev.items.filter((item) => item.id !== itemId),
+      };
+      return recalculateOrder(next);
+    });
+  };
+
   // Filtered Data
   const filteredProducts = products.filter(p => 
-    productCategoryFilter === 'All' || p.category === productCategoryFilter
+    (productCategoryFilter === 'All' || p.category === productCategoryFilter) &&
+    p.name.toLowerCase().includes(productSearch.toLowerCase())
   );
 
   const filteredOrders = orders.filter(order => {
@@ -309,6 +414,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
             </button>
           </div>
 
+          <input
+            type="text"
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            placeholder="Search product by name..."
+            className="w-full max-w-md rounded-xl border border-[#4A3728]/10 bg-white px-4 py-2.5 outline-none ring-[#D97706] focus:ring-2"
+          />
+
           <div className="flex gap-2 overflow-x-auto pb-4">
             {adminCategories.map(cat => (
               <button
@@ -353,10 +466,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         value={newProduct.category}
                         onChange={e => setNewProduct({...newProduct, category: e.target.value})}
                       >
-                        <option>Coffee</option>
-                        <option>Pastry</option>
-                        <option>Drinks</option>
-                        <option>Snacks</option>
+                        {CATEGORY_OPTIONS.map((category) => (
+                          <option key={category}>{category}</option>
+                        ))}
                       </select>
                     </td>
                     <td className="p-4">
@@ -402,10 +514,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           value={editingProduct?.category || ''}
                           onChange={e => setEditingProduct(prev => prev ? {...prev, category: e.target.value} : null)}
                         >
-                          <option>Coffee</option>
-                          <option>Pastry</option>
-                          <option>Drinks</option>
-                          <option>Snacks</option>
+                          {CATEGORY_OPTIONS.map((category) => (
+                            <option key={category}>{category}</option>
+                          ))}
                         </select>
                       ) : (
                         <span className="px-2 py-1 bg-[#FDF8F3] text-[#4A3728]/60 rounded-md text-xs font-bold uppercase tracking-wider border border-[#4A3728]/5">
@@ -512,6 +623,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
               >
                 <Download size={20} /> Export Filtered CSV
               </button>
+              <button
+                onClick={undoLastOrderChange}
+                disabled={orderUndoStack.length === 0}
+                className="mt-3 w-full bg-white border border-[#4A3728]/15 text-[#4A3728] py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-[#FDF8F3] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Undo2 size={18} /> Undo Last Order Change
+              </button>
             </div>
           </div>
 
@@ -566,24 +684,102 @@ export const AdminView: React.FC<AdminViewProps> = ({
               {filteredOrders.length === 0 ? (
                 <div className="p-10 text-center text-[#4A3728]/30">No orders found for this period.</div>
               ) : (
-                filteredOrders.map(order => (
-                  <div key={order.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-[#FDF8F3]/50 transition-colors">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-xs font-bold bg-[#4A3728]/5 px-2 py-1 rounded text-[#4A3728]/60">#{order.id.slice(-6)}</span>
-                        <span className="text-sm text-[#4A3728]/40">{format(order.timestamp, 'MMM dd, HH:mm')}</span>
-                        {order.paymentMethod === 'Card' ? <CreditCard size={14} className="text-blue-500" /> : <Banknote size={14} className="text-green-500" />}
+                filteredOrders.map(order => {
+                  const isEditing = editingOrderId === order.id;
+                  const activeOrder = isEditing && editingOrderDraft ? editingOrderDraft : order;
+
+                  return (
+                    <div key={order.id} className="p-4 hover:bg-[#FDF8F3]/50 transition-colors space-y-3">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-mono text-xs font-bold bg-[#4A3728]/5 px-2 py-1 rounded text-[#4A3728]/60">#{order.id.slice(-6)}</span>
+                            <span className="text-sm text-[#4A3728]/40">{format(order.timestamp, 'MMM dd, HH:mm')}</span>
+                            {order.paymentMethod === 'Card' ? <CreditCard size={14} className="text-blue-500" /> : <Banknote size={14} className="text-green-500" />}
+                          </div>
+                          <p className="text-sm">{activeOrder.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-black text-[#D97706]">{activeOrder.total.toLocaleString()} SYP</p>
+                          <p className="text-[10px] text-[#4A3728]/40">Incl. {activeOrder.tax.toLocaleString()} SYP tax</p>
+                        </div>
                       </div>
-                      <p className="text-sm">
-                        {order.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}
-                      </p>
+
+                      <div className="flex justify-end gap-2">
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={saveOrderDraft}
+                              className="px-3 py-1.5 rounded-lg text-sm font-bold bg-green-600 text-white hover:bg-green-700"
+                            >
+                              Save Order
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingOrderId(null);
+                                setEditingOrderDraft(null);
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-sm font-bold bg-white border border-[#4A3728]/15 hover:bg-[#FDF8F3]"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => startEditOrder(order)}
+                              className="px-3 py-1.5 rounded-lg text-sm font-bold bg-white border border-[#4A3728]/15 hover:bg-[#FDF8F3] flex items-center gap-1"
+                            >
+                              <Edit2 size={14} /> Edit
+                            </button>
+                            <button
+                              onClick={() => deleteOrder(order.id)}
+                              className="px-3 py-1.5 rounded-lg text-sm font-bold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 flex items-center gap-1"
+                            >
+                              <Trash2 size={14} /> Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      {isEditing && editingOrderDraft && (
+                        <div className="rounded-xl border border-[#4A3728]/10 bg-white p-3 space-y-2">
+                          {editingOrderDraft.items.length === 0 && (
+                            <p className="text-sm text-[#4A3728]/50">No items left in this order. Add from POS if needed.</p>
+                          )}
+                          {editingOrderDraft.items.map((item) => (
+                            <div key={item.id} className="grid grid-cols-12 gap-2 items-center text-sm">
+                              <span className="col-span-4 font-semibold truncate">{item.name}</span>
+                              <input
+                                type="number"
+                                min={1}
+                                value={item.quantity}
+                                onChange={(e) => updateDraftItem(item.id, 'quantity', Number(e.target.value))}
+                                className="col-span-2 rounded border border-[#4A3728]/15 px-2 py-1"
+                              />
+                              <input
+                                type="number"
+                                min={0}
+                                step={1}
+                                value={item.price}
+                                onChange={(e) => updateDraftItem(item.id, 'price', Number(e.target.value))}
+                                className="col-span-3 rounded border border-[#4A3728]/15 px-2 py-1"
+                              />
+                              <span className="col-span-2 text-right font-semibold">{item.subtotal.toLocaleString()} SYP</span>
+                              <button
+                                onClick={() => removeDraftItem(item.id)}
+                                className="col-span-1 justify-self-end text-red-600 hover:text-red-700"
+                                title="Remove item"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <p className="font-black text-[#D97706]">{order.total.toLocaleString()} SYP</p>
-                      <p className="text-[10px] text-[#4A3728]/40">Incl. {order.tax.toLocaleString()} SYP tax</p>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
