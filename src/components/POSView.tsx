@@ -105,7 +105,7 @@ export const POSView: React.FC<POSViewProps> = ({ products, onCompleteOrder }) =
   };
 
   const cartSubtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-  const tax = Math.round(cartSubtotal * 0.07);
+  const tax = 0;
   const cartTotal = cartSubtotal + tax;
 
   const printReceipt = (order: Order) => {
@@ -165,7 +165,6 @@ export const POSView: React.FC<POSViewProps> = ({ products, onCompleteOrder }) =
           </table>
           <div class="totals">
             <p><span>Subtotal</span><span>${order.subtotal.toLocaleString()} SYP</span></p>
-            <p><span>Tax</span><span>${order.tax.toLocaleString()} SYP</span></p>
             <p class="grand"><span>Total</span><span>${order.total.toLocaleString()} SYP</span></p>
           </div>
           <p style="margin-top:24px; font-size:12px; color:#6f5b49;">Thank you for visiting Palette.</p>
@@ -324,7 +323,6 @@ export const POSView: React.FC<POSViewProps> = ({ products, onCompleteOrder }) =
             <span>{cartSubtotal.toLocaleString()} SYP</span>
           </div>
           <div className="flex justify-between text-sm opacity-70">
-            <span>Tax (7%)</span>
             <span>{tax.toLocaleString()} SYP</span>
           </div>
           <div className="flex justify-between text-2xl font-black">
@@ -407,7 +405,6 @@ export const POSView: React.FC<POSViewProps> = ({ products, onCompleteOrder }) =
 
               <div className="pt-2 space-y-1 text-sm">
                 <div className="flex justify-between"><span>Subtotal</span><span>{completedOrder.subtotal.toLocaleString()} SYP</span></div>
-                <div className="flex justify-between"><span>Tax</span><span>{completedOrder.tax.toLocaleString()} SYP</span></div>
                 <div className="flex justify-between text-lg font-black text-[#D97706]"><span>Total</span><span>{completedOrder.total.toLocaleString()} SYP</span></div>
               </div>
 
