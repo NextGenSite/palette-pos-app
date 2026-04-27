@@ -712,7 +712,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         </div>
                         <div className="text-right">
                           <p className="font-black text-[#D97706]">{activeOrder.total.toLocaleString()} SYP</p>
-                          <p className="text-[10px] text-[#4A3728]/40">No tax</p>
                         </div>
                       </div>
 

@@ -323,7 +323,6 @@ export const POSView: React.FC<POSViewProps> = ({ products, onCompleteOrder }) =
             <span>{cartSubtotal.toLocaleString()} SYP</span>
           </div>
           <div className="flex justify-between text-sm opacity-70">
-            <span>{tax.toLocaleString()} SYP</span>
           </div>
           <div className="flex justify-between text-2xl font-black">
             <span>Total</span>
