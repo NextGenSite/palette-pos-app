@@ -13,7 +13,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ target, onSuccess, onCance
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const correctPassword = target === 'pos' ? '060825' : 'Palette@25';
+    const correctPassword = target === 'pos' ? '000' : 'Palette@25';
     
     if (password === correctPassword) {
       onSuccess();
