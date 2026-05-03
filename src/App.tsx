@@ -259,24 +259,39 @@ function App() {
           return;
         }
 
-        if (!lastCloudUpdateAt || new Date(data.updated_at).getTime() > new Date(lastCloudUpdateAt).getTime()) {
-          const payload = data.payload as AppStatePayload;
-          const normalizedProducts = normalizeProducts(payload.products);
-          isApplyingCloudUpdate.current = true;
-          setProducts(normalizedProducts);
-          setOrders(payload.orders || []);
-          setPdfMenu(payload.pdfMenu || null);
-          setMenuImages(payload.menuImages || []);
-          setCategories(payload.categories && payload.categories.length > 0 ? payload.categories : [...CATEGORY_OPTIONS]);
-          setLastCloudUpdateAt(data.updated_at);
-          setTimeout(() => {
-            isApplyingCloudUpdate.current = false;
-          }, 0);
-        }
+  //      if (!lastCloudUpdateAt || new Date(data.updated_at).getTime() > new Date(lastCloudUpdateAt).getTime()) {
+  //        const payload = data.payload as AppStatePayload;
+  //        const normalizedProducts = normalizeProducts(payload.products);
+  //        isApplyingCloudUpdate.current = true;
+  //        setProducts(normalizedProducts);
+  //        setOrders(payload.orders || []);
+  //        setPdfMenu(payload.pdfMenu || null);
+  //        setMenuImages(payload.menuImages || []);
+  //        setCategories(payload.categories && payload.categories.length > 0 ? payload.categories : [...CATEGORY_OPTIONS]);
+  //        setLastCloudUpdateAt(data.updated_at);
+  //        setTimeout(() => {
+  //          isApplyingCloudUpdate.current = false;
+  //        }, 0);
+  //      } HIER
+        const payload = data.payload as AppStatePayload;
+        const normalizedProducts = normalizeProducts(payload.products);
+
+        isApplyingCloudUpdate.current = true;
+
+        setProducts(normalizedProducts);
+        setOrders(payload.orders || []);
+        setPdfMenu(payload.pdfMenu || null);
+        setMenuImages(payload.menuImages || []);
+        setCategories(payload.categories && payload.categories.length > 0 ? payload.categories : [...CATEGORY_OPTIONS]);
+        setLastCloudUpdateAt(data.updated_at);
+
+        setTimeout(() => {
+          isApplyingCloudUpdate.current = false;
+        }, 0);
       } catch {
         // Keep UI responsive even if one poll fails.
       }
-    }, 5000);
+    }, 2000);
 
     return () => {
       window.clearInterval(pollInterval);
